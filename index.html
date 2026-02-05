@@ -1,0 +1,448 @@
+<!-- Chosen Palette: Archaeologist's Notebook (Bone White, Sand, Terracotta, Charcoal) -->
+<!-- Application Structure Plan: 
+    1. Horizontal Parameter Bar (Top): Fixed variable naming mismatch (leasableRatio vs leaseRatio).
+    2. Financial Dashboard: High-visibility KPI cards with text-6xl values.
+    3. Revenue Chart: Enhanced datalabels for revenue segments to show prominently beside the segments.
+    4. Bug Fix: Resolved ReferenceError by unifying variable names in the calculate function.
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时空深处 | 全要素投产测算系统 v9.4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;700;900&family=Playfair+Display:wght@700;900&display=swap');
+        
+        :root {
+            --color-bg: #FDFCF8;
+            --color-terra: #C17C54;
+            --color-text: #4A4238;
+            --color-sand: #E5DCC5;
+            --color-stone: #78716C;
+        }
+
+        body { background-color: var(--color-bg); color: var(--color-text); font-family: 'Noto Sans SC', sans-serif; }
+        .serif { font-family: 'Playfair Display', serif; }
+
+        .slider { -webkit-appearance: none; width: 100%; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; outline: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #C17C54; border-radius: 50%; cursor: pointer; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); }
+
+        .card { background: white; border: 1px solid #E5DCC5; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        
+        .kpi-title { font-size: 0.85rem; font-weight: 800; color: var(--color-stone); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
+        .kpi-value { font-family: 'Playfair Display', serif; font-weight: 900; line-height: 1; }
+
+        .revenue-highlight { background-color: #F0F4F0; border-color: #A7C0A7; border-width: 2px; }
+        .budget-highlight { background-color: #F9F7F2; border-color: var(--color-terra); border-width: 2px; }
+        
+        .param-group { border-right: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1.5rem; }
+        .param-group:last-child { border-right: none; }
+        
+        .label-text { font-size: 13px; font-weight: 500; opacity: 0.9; }
+        .value-text { font-size: 15px; font-weight: 900; color: #C17C54; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-screen-2xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 flex justify-between items-end border-b border-[#E5DCC5] pb-4">
+            <div>
+                <h1 class="text-3xl font-extrabold serif tracking-tight text-[#4A4238]">“时空深处”全要素投产测算系统 <span class="text-sm font-normal text-stone-400 ml-2">v9.4 财务修正版</span></h1>
+            </div>
+            <div class="hidden md:flex gap-4 text-[12px] font-bold uppercase text-[#C17C54]">
+                <span class="bg-[#F9F7F2] px-3 py-1 rounded">资产轻量化模型</span>
+                <span class="bg-[#F9F7F2] px-3 py-1 rounded">变量命名修正</span>
+            </div>
+        </header>
+
+        <!-- TOP RESPONSIVE PARAMETER BAR -->
+        <div class="card p-6 mb-8 bg-[#4A4238] text-white shadow-2xl">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-8">
+                
+                <!-- Group: Scale & Input -->
+                <div class="param-group">
+                    <p class="text-[11px] font-black text-[#C17C54] mb-4 uppercase tracking-[0.2em]">规模与投入</p>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">高峰日接待量</span><span id="label-cap" class="value-text">8000人</span></div>
+                            <input type="range" min="2000" max="15000" step="500" value="8000" class="slider" id="param-cap">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">亩均开发成本</span><span id="label-invest" class="value-text">18万</span></div>
+                            <input type="range" min="10" max="30" step="1" value="18" class="slider" id="param-invest">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">土地租金 (元/亩)</span><span id="label-land-rent-rate" class="value-text">3000元</span></div>
+                            <input type="range" min="1000" max="8000" step="500" value="3000" class="slider" id="param-land-rent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group: Tickets -->
+                <div class="param-group">
+                    <p class="text-[11px] font-black text-[#C17C54] mb-4 uppercase tracking-[0.2em]">票务体系</p>
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="flex flex-col mb-1"><span class="label-text">成人单票</span><span id="label-price" class="value-text">￥128</span></div>
+                                <input type="range" min="60" max="300" step="1" value="128" class="slider" id="param-price">
+                            </div>
+                            <div>
+                                <div class="flex flex-col mb-1"><span class="label-text">儿童价比例</span><span id="label-child-ratio" class="value-text">60%</span></div>
+                                <input type="range" min="50" max="80" step="5" value="60" class="slider" id="param-child-ratio">
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">套餐折扣率</span><span id="label-combo-discount" class="value-text">80%</span></div>
+                            <input type="range" min="60" max="80" step="10" value="80" class="slider" id="param-combo-discount">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group: Marketing -->
+                <div class="param-group">
+                    <p class="text-[11px] font-black text-[#C17C54] mb-4 uppercase tracking-[0.2em]">渠道与营销</p>
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text leading-tight">渠道结算折扣</span><span id="label-mkt-ratio" class="value-text">65%</span></div>
+                            <input type="range" min="50" max="90" step="1" value="65" class="slider" id="param-mkt-ratio">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">开幕期成本系数</span><span id="label-opening" class="value-text">20%</span></div>
+                            <input type="range" min="10" max="25" step="5" value="20" class="slider" id="param-opening">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group: Commercial -->
+                <div class="param-group">
+                    <p class="text-[11px] font-black text-[#C17C54] mb-4 uppercase tracking-[0.2em]">商业配套</p>
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">可经营面积比例</span><span id="label-leasable" class="value-text">15%</span></div>
+                            <input type="range" min="5" max="30" step="1" value="15" class="slider" id="param-leasable">
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><span class="label-text">商业租金 (㎡)</span><span id="label-biz-rent" class="value-text">￥80</span></div>
+                            <input type="range" min="30" max="200" step="5" value="80" class="slider" id="param-biz-rent">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- MAIN KPI DASHBOARD -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="card p-8 flex flex-col justify-center border-l-8 border-l-stone-300">
+                <p class="kpi-title">建议选址规模</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="res-mu" class="text-6xl font-black kpi-value text-[#4A4238]">-</span>
+                    <span class="text-xl text-stone-400 font-bold uppercase">亩</span>
+                </div>
+                <p id="res-area" class="text-sm font-bold text-stone-400 mt-2 tracking-widest">- ㎡</p>
+            </div>
+            
+            <div class="card p-8 flex flex-col justify-center border-l-8 border-l-[#C17C54]">
+                <p class="kpi-title">开发总投资 (CAPEX)</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="res-capex" class="text-6xl font-black kpi-value text-[#4A4238]">-</span>
+                    <span class="text-xl text-stone-400 font-bold uppercase">万元</span>
+                </div>
+                <p class="text-sm font-bold text-stone-400 mt-2 tracking-widest">仅包含建设投资，不含流动资金</p>
+            </div>
+            
+            <div class="card p-8 revenue-highlight flex flex-col justify-center border-l-8 border-l-green-600">
+                <p class="kpi-title text-green-800">年度稳态总营收</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="res-revenue" class="text-6xl font-black text-green-800 serif">-</span>
+                    <span class="text-xl text-green-600 font-bold uppercase">万元</span>
+                </div>
+                <p class="text-sm font-bold text-green-600/60 mt-2 tracking-widest italic">全渠道净额 (扣除佣金后)</p>
+            </div>
+            
+            <div class="card p-8 budget-highlight flex flex-col justify-center border-l-8 border-l-[#C17C54]">
+                <p class="kpi-title text-[#C17C54]">项目静态回收期</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="res-roi" class="text-6xl font-black text-[#C17C54] serif">-</span>
+                    <span class="text-xl text-[#C17C54] font-bold uppercase">年</span>
+                </div>
+                <p class="text-sm font-bold text-stone-500 mt-2 tracking-widest italic">综合盈利测算周期</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+            <!-- Left: Detailed Matrix -->
+            <div class="lg:col-span-8 space-y-8">
+                <div class="card p-8 bg-white">
+                    <h3 class="text-sm font-black text-stone-400 mb-8 uppercase tracking-[0.2em] border-b border-stone-100 pb-4">票务价格体系精算</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="p-6 bg-stone-50 rounded-2xl">
+                            <p class="text-xs font-bold text-stone-400 mb-2">成人票基准</p>
+                            <p id="val-p-adult" class="text-3xl font-black text-[#4A4238]">￥128</p>
+                            <p id="val-p-net-adult" class="text-xs font-bold text-[#C17C54] mt-2">渠道净得: ￥83</p>
+                        </div>
+                        <div class="p-6 bg-stone-50 rounded-2xl">
+                            <p class="text-xs font-bold text-stone-400 mb-2">儿童票比例</p>
+                            <p id="val-p-child" class="text-3xl font-black text-stone-500">￥77</p>
+                            <p class="text-xs font-bold text-stone-400 mt-2">折扣比: <span id="logic-child-pct">60</span>%</p>
+                        </div>
+                        <div class="p-6 bg-[#FDFCF8] border-2 border-sand-200 rounded-2xl">
+                            <p class="text-xs font-bold text-stone-400 mb-2">家庭套餐 A</p>
+                            <p id="val-p-combo1" class="text-3xl font-black text-[#C17C54]">￥226</p>
+                            <p class="text-xs font-bold text-stone-500 mt-2">1大2小 | 折扣: <span id="logic-combo-pct1">80</span>%</p>
+                        </div>
+                        <div class="p-6 bg-[#FDFCF8] border-2 border-sand-200 rounded-2xl">
+                            <p class="text-xs font-bold text-stone-400 mb-2">家庭套餐 B</p>
+                            <p id="val-p-combo2" class="text-3xl font-black text-[#C17C54]">￥328</p>
+                            <p class="text-xs font-bold text-stone-500 mt-2">2大2小 | 折扣: <span id="logic-combo-pct2">80</span>%</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="card p-8">
+                        <h3 class="text-sm font-black text-stone-400 mb-6 uppercase tracking-widest">年度收入渠道构成</h3>
+                        <div class="h-80"><canvas id="revChart"></canvas></div>
+                    </div>
+                    <div class="card p-8">
+                        <h3 class="text-sm font-black text-stone-400 mb-6 uppercase tracking-widest">收支平衡年度模型</h3>
+                        <div class="h-80"><canvas id="profitChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Operational Summary -->
+            <div class="lg:col-span-4 space-y-8">
+                <div class="card p-8 bg-[#4A4238] text-white shadow-xl">
+                    <h3 class="text-lg font-bold border-b border-stone-600 pb-4 serif mb-8">年度经营指标概览</h3>
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-end border-b border-stone-700 pb-4">
+                            <span class="text-xs font-bold opacity-60 uppercase">首年启动资金总投入</span>
+                            <span id="res-first-year" class="font-black text-3xl text-[#C17C54]">-</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-stone-700 pb-4">
+                            <span class="text-xs font-bold opacity-60 uppercase">年度土地租金支出</span>
+                            <span id="res-land-rent-total" class="font-black text-2xl">-</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-stone-700 pb-4">
+                            <div class="flex flex-col">
+                                <span class="text-xs font-bold opacity-60 uppercase">预测年游客总人次</span>
+                                <span class="text-[9px] text-[#C17C54] opacity-80 mt-1">负载系数: 45% (稳态)</span>
+                            </div>
+                            <span id="res-visitors" class="font-black text-2xl">-</span>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <span class="text-xs font-bold opacity-60 uppercase">综合人均消费 (ARPU)</span>
+                            <span id="res-arpu" class="font-black text-2xl text-[#C17C54]">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-8 bg-[#F9F7F2] border-none text-xs leading-loose">
+                    <p class="font-black text-[#C17C54] mb-4 text-sm tracking-widest">◆ 财务核心推导逻辑</p>
+                    <ul class="space-y-4 text-stone-600">
+                        <li class="flex gap-2">
+                            <span>•</span> 
+                            <span><b>年游客量推导</b>：基于“高峰日接待量 × 负载率(45%) × 运营天数(365)”。负载率已综合考虑工作日空置与寒暑假/周末爆满的平衡。</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <span>•</span> 
+                            <span><b>首年总投入资金</b>：CAPEX + 第一年总运营支出（含租金、人力及营销）。针对文旅特性，额外预留了 <span id="logic-opening-pct">20</span>% 的开幕期不可预见费。</span>
+                        </li>
+                        <li class="flex gap-2"><span>•</span> <span><b>渠道分成说明</b>：已按 <span id="logic-mkt-pct">65</span>% 折扣计入 OTA/分销商结算价。</span></li>
+                        <li class="flex gap-2"><span>•</span> <span><b>组合定价折扣</b>：家庭套餐折扣率为 <span id="logic-combo-pct-total">80</span>%。</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-[11px] text-stone-400 font-black uppercase tracking-[0.4em] pb-16">
+            &copy; 2026 DEEP TIME ARCHAEO-PARK | FINANCIAL PLANNING SYSTEM v9.4
+        </footer>
+    </div>
+
+    <script>
+        Chart.register(ChartDataLabels);
+        let revChart, profitChart;
+
+        const CONST = {
+            annualLoad: 0.45,
+            days: 365,
+            dwell: 3.5,
+            comfort: 12,
+            facMult: 2.2,
+            buf: 0.15,
+            mu: 666.67,
+            eventPct: 0.05
+        };
+
+        function calculate() {
+            const setUI = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.innerText = val;
+            };
+
+            // Inputs
+            const cap = parseInt(document.getElementById('param-cap').value);
+            const investMu = parseInt(document.getElementById('param-invest').value);
+            const rentMuRate = parseInt(document.getElementById('param-land-rent').value);
+            const pAdult = parseInt(document.getElementById('param-price').value);
+            const childRatio = parseInt(document.getElementById('param-child-ratio').value) / 100;
+            const comboDiscount = parseInt(document.getElementById('param-combo-discount').value) / 100;
+            const mktRatio = parseInt(document.getElementById('param-mkt-ratio').value) / 100;
+            const openRatio = parseInt(document.getElementById('param-opening').value) / 100;
+            const leaseRatio = parseInt(document.getElementById('param-leasable').value) / 100;
+            const bizRentSqm = parseInt(document.getElementById('param-biz-rent').value);
+
+            // Update Labels
+            setUI('label-cap', cap + '人');
+            setUI('label-invest', investMu + '万');
+            setUI('label-land-rent-rate', rentMuRate + '元');
+            setUI('label-price', '￥' + pAdult);
+            setUI('label-child-ratio', (childRatio*100) + '%');
+            setUI('label-combo-discount', (comboDiscount*100) + '%');
+            setUI('label-mkt-ratio', (mktRatio*100) + '%');
+            setUI('label-opening', (openRatio*100) + '%');
+            setUI('label-leasable', (leaseRatio*100) + '%'); // Fixed variable naming here
+            setUI('label-biz-rent', '￥' + bizRentSqm);
+            
+            setUI('logic-child-pct', (childRatio*100));
+            setUI('logic-combo-pct1', (comboDiscount*100));
+            setUI('logic-combo-pct2', (comboDiscount*100));
+            setUI('logic-combo-pct-total', (comboDiscount*100));
+            setUI('logic-mkt-pct', (mktRatio*100));
+            setUI('logic-opening-pct', (openRatio*100));
+
+            // 1. Pricing logic
+            const pChild = pAdult * childRatio;
+            const pCombo1 = (pAdult + 2 * pChild) * comboDiscount; 
+            const pCombo2 = (2 * pAdult + 2 * pChild) * comboDiscount; 
+
+            setUI('val-p-adult', '￥' + pAdult);
+            setUI('val-p-net-adult', '渠道净得: ￥' + Math.round(pAdult * mktRatio));
+            setUI('val-p-child', '￥' + Math.round(pChild));
+            setUI('val-p-combo1', '￥' + Math.round(pCombo1));
+            setUI('val-p-combo2', '￥' + Math.round(pCombo2));
+
+            // 2. Area & Scale logic
+            const instantCap = Math.ceil(cap / (10/CONST.dwell));
+            const facArea = instantCap * CONST.comfort * CONST.facMult;
+            const totalArea = Math.ceil(facArea / (1 - CONST.buf) + 15000); 
+            const muSize = totalArea / CONST.mu;
+            const leasableArea = facArea * leaseRatio;
+
+            // 3. Revenue logic (Yearly)
+            const visitors = cap * CONST.annualLoad * CONST.days;
+            const weightedTicket = (pAdult * 0.3) + (pChild * 0.2) + (pCombo1/3 * 0.25) + (pCombo2/4 * 0.25);
+            const ticketRevNet = (visitors * weightedTicket * mktRatio) / 10000;
+            const bizRev = (leasableArea * bizRentSqm * 12 + leasableArea * 700 * 12 * 0.15) / 10000; 
+            const eventRev = ticketRevNet * CONST.eventPct;
+            const totalRev = ticketRevNet + bizRev + eventRev;
+
+            // 4. Investment & OPEX logic
+            const capex = muSize * investMu;
+            const annualLandRent = (muSize * rentMuRate) / 10000; 
+            const laborOpex = (visitors * 15 / 10000); 
+            const maintenanceOpex = capex * 0.12; 
+            const baseOpex = annualLandRent + laborOpex + maintenanceOpex;
+            
+            const firstYearTotal = capex + baseOpex + (baseOpex * openRatio);
+            const netProfit = totalRev - baseOpex;
+            const payback = capex / (netProfit > 0 ? netProfit : 1);
+
+            // 5. Update Dashboard Results
+            setUI('res-mu', muSize.toFixed(0));
+            setUI('res-area', totalArea.toLocaleString() + ' ㎡');
+            setUI('res-capex', capex.toLocaleString(undefined, {maximumFractionDigits:0}));
+            setUI('res-revenue', totalRev.toLocaleString(undefined, {maximumFractionDigits:0}));
+            setUI('res-roi', (netProfit > 0) ? payback.toFixed(1) : '∞');
+            
+            setUI('res-first-year', '￥' + firstYearTotal.toLocaleString(undefined, {maximumFractionDigits:0}) + '万');
+            setUI('res-land-rent-total', '￥' + annualLandRent.toFixed(0) + '万');
+            setUI('res-leasable', Math.round(leasableArea) + ' ㎡');
+            setUI('res-visitors', (visitors/10000).toFixed(1) + ' 万人');
+            setUI('res-arpu', '￥' + (totalRev * 10000 / visitors).toFixed(0));
+
+            updateCharts(ticketRevNet, bizRev, eventRev, totalRev, baseOpex);
+        }
+
+        function updateCharts(tkt, biz, evt, rev, exp) {
+            const revD = [tkt, biz, evt];
+            if (revChart) { 
+                revChart.data.datasets[0].data = revD; 
+                revChart.update(); 
+            } else {
+                const ctx = document.getElementById('revChart').getContext('2d');
+                revChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['门票净收', '商业经营', '场地增值'],
+                        datasets: [{ data: revD, backgroundColor: ['#4A4238', '#C17C54', '#E5DCC5'], borderWidth: 0 }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        cutout: '75%', 
+                        layout: { padding: 40 }, 
+                        plugins: { 
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } },
+                            datalabels: {
+                                anchor: 'end',
+                                align: 'end',
+                                offset: 15,
+                                color: '#4A4238',
+                                font: { size: 12, weight: '900' },
+                                formatter: (val) => val.toFixed(0) + '万'
+                            }
+                        } 
+                    }
+                });
+            }
+
+            const profD = [rev, exp];
+            if (profitChart) { 
+                profitChart.data.datasets[0].data = profD; 
+                profitChart.update(); 
+            } else {
+                const ctx = document.getElementById('profitChart').getContext('2d');
+                profitChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['年度总营收', '年度总支出'],
+                        datasets: [{ data: profD, backgroundColor: ['#C17C54', '#4A4238'], borderRadius: 6 }]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, 
+                        plugins: { 
+                            legend: { display: false }, 
+                            datalabels: { anchor: 'end', align: 'top', font: { size: 11, weight: '900' }, formatter: (v) => v.toFixed(0) + '万' } 
+                        },
+                        scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 11, weight: 'bold' } } } }
+                    }
+                });
+            }
+        }
+
+        const inputIds = [
+            'param-cap', 'param-invest', 'param-land-rent', 'param-price', 
+            'param-child-ratio', 'param-combo-discount', 'param-mkt-ratio', 
+            'param-opening', 'param-leasable', 'param-biz-rent'
+        ];
+
+        inputIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', calculate);
+        });
+
+        window.onload = calculate;
+    </script>
+</body>
+</html>
